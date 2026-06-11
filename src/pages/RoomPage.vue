@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useRoom } from '@/composables/useRoom'
 import { useExpire } from '@/composables/useExpire'
@@ -8,7 +8,7 @@ import type { Topic, TopicType, TopicTemplate } from '@/types'
 import { TOPIC_COLORS, TOPIC_EMOJIS } from '@/types'
 import TopicCard from '@/components/TopicCard.vue'
 import MemberAvatar from '@/components/MemberAvatar.vue'
-import { copyToClipboard, getDaysRemaining } from '@/utils/helpers'
+import { copyToClipboard, getDaysRemaining, getAppointmentReminder, formatAppointmentTime } from '@/utils/helpers'
 
 const route = useRoute()
 const router = useRouter()
@@ -22,6 +22,9 @@ const authorName = ref('')
 const showAddTopic = ref(false)
 const copySuccess = ref(false)
 const selectedTemplate = ref<TopicTemplate | null>(null)
+const tick = ref(0)
+
+let timer: number | null = null
 
 const roomId = computed(() => route.params.id as string)
 
@@ -39,6 +42,15 @@ const canStartGame = computed(() =>
 
 const expirationWarning = computed(() => 
   currentRoom.value ? getExpirationWarning(currentRoom.value.expiresAt) : null
+)
+
+const appointmentReminder = computed(() => {
+  const _ = tick.value
+  return currentRoom.value ? getAppointmentReminder(currentRoom.value.appointmentTime) : { level: null, message: null }
+})
+
+const appointmentTimeDisplay = computed(() => 
+  currentRoom.value ? formatAppointmentTime(currentRoom.value.appointmentTime) : null
 )
 
 onMounted(() => {
@@ -61,6 +73,17 @@ onMounted(() => {
   
   if (currentRoom.value?.members.length) {
     authorName.value = currentRoom.value.members[0].name
+  }
+
+  timer = window.setInterval(() => {
+    tick.value++
+  }, 30000)
+})
+
+onUnmounted(() => {
+  if (timer) {
+    clearInterval(timer)
+    timer = null
   }
 })
 
@@ -132,6 +155,36 @@ const goToGame = () => {
     class="room-page min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-orange-50"
   >
     <div class="max-w-4xl mx-auto px-4 py-6">
+      <div
+        v-if="appointmentReminder.level && currentRoom.status !== 'playing'"
+        class="mb-6 rounded-2xl p-4 shadow-lg bg-gradient-to-r flex items-center gap-4"
+        :class="{
+          'from-red-500 to-orange-500 text-white': appointmentReminder.level === 'urgent',
+          'from-orange-400 to-yellow-400 text-white': appointmentReminder.level === 'soon',
+          'from-blue-400 to-indigo-400 text-white': appointmentReminder.level === 'upcoming'
+        }"
+      >
+        <div class="text-4xl animate-pulse">
+          {{ appointmentReminder.level === 'urgent' ? '🚨' : '⏰' }}
+        </div>
+        <div class="flex-1">
+          <div class="font-bold text-xl mb-1">
+            {{ appointmentReminder.message }}
+          </div>
+          <div class="text-sm opacity-90">
+            约定时间：{{ appointmentTimeDisplay }} · 快提醒成员们别迟到！
+          </div>
+        </div>
+        <div v-if="canStartGame && appointmentReminder.level === 'urgent'" class="shrink-0">
+          <button
+            class="px-4 py-2 bg-white text-purple-600 rounded-full font-bold text-sm shadow-md hover:shadow-lg transition-all"
+            @click="handleStartGame"
+          >
+            🎴 立即开始
+          </button>
+        </div>
+      </div>
+
       <div class="flex items-center justify-between mb-6">
         <button 
           class="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors"
@@ -166,6 +219,11 @@ const goToGame = () => {
                   <span>{{ currentRoom.code }}</span>
                   <span class="text-xs">📋</span>
                 </button>
+              </div>
+              
+              <div v-if="appointmentTimeDisplay" class="flex items-center gap-2">
+                <span class="text-gray-500">📅</span>
+                <span class="font-medium text-purple-600">{{ appointmentTimeDisplay }}</span>
               </div>
               
               <span 

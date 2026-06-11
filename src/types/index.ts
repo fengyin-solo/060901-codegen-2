@@ -4,6 +4,7 @@ export interface Room {
   code: string
   createdAt: string
   expiresAt: string
+  appointmentTime: string | null
   status: 'preparing' | 'playing' | 'ended'
   currentTurn: number
   members: Member[]

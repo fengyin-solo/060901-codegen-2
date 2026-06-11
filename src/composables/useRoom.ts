@@ -19,7 +19,7 @@ export function useRoom() {
     rooms.value = getRooms()
   }
 
-  const createRoom = (name: string, hostName: string): Room => {
+  const createRoom = (name: string, hostName: string, appointmentTime: string | null = null): Room => {
     const now = new Date()
     const expiresAt = addDays(now, 7)
     
@@ -29,6 +29,7 @@ export function useRoom() {
       code: generateRoomCode(),
       createdAt: now.toISOString(),
       expiresAt: expiresAt.toISOString(),
+      appointmentTime,
       status: 'preparing',
       currentTurn: 0,
       members: [

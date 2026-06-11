@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Room } from '@/types'
 import { useExpire } from '@/composables/useExpire'
-import { getDaysRemaining, formatDate } from '@/utils/helpers'
+import { getDaysRemaining, formatDate, getAppointmentReminder, formatAppointmentTime } from '@/utils/helpers'
 
 defineProps<{
   room: Room
@@ -26,6 +26,15 @@ const statusColor = (status: Room['status']) => {
     case 'preparing': return 'bg-blue-500'
     case 'playing': return 'bg-green-500'
     case 'ended': return 'bg-gray-500'
+  }
+}
+
+const reminderBadgeClass = (level: string | null) => {
+  switch (level) {
+    case 'urgent': return 'bg-red-100 text-red-700 border-red-200'
+    case 'soon': return 'bg-orange-100 text-orange-700 border-orange-200'
+    case 'upcoming': return 'bg-blue-100 text-blue-700 border-blue-200'
+    default: return 'bg-gray-100 text-gray-600 border-gray-200'
   }
 }
 </script>
@@ -65,18 +74,30 @@ const statusColor = (status: Room['status']) => {
         <span>{{ room.topics.length }} 个话题</span>
       </div>
       
-      <div class="flex items-center gap-2">
+      <div v-if="room.appointmentTime" class="flex items-center gap-2">
+        <span class="text-gray-400">📅</span>
+        <span>{{ formatAppointmentTime(room.appointmentTime) }}</span>
+      </div>
+      
+      <div v-else class="flex items-center gap-2">
         <span class="text-gray-400">⏰</span>
         <span>{{ formatDate(room.createdAt) }}</span>
       </div>
     </div>
     
-    <div 
-      v-if="getExpirationWarning(room.expiresAt)"
-      class="mt-3 pt-3 border-t border-gray-100"
-    >
+    <div class="mt-3 pt-3 border-t border-gray-100 space-y-2">
+      <span
+        v-if="getAppointmentReminder(room.appointmentTime).message"
+        class="text-xs px-2 py-1 rounded-full border inline-flex items-center gap-1"
+        :class="reminderBadgeClass(getAppointmentReminder(room.appointmentTime).level)"
+      >
+        <span>{{ getAppointmentReminder(room.appointmentTime).level === 'urgent' ? '🚨' : getAppointmentReminder(room.appointmentTime).level === 'soon' ? '⏰' : '🔔' }}</span>
+        {{ getAppointmentReminder(room.appointmentTime).message }}
+      </span>
+      
       <span 
-        class="text-xs px-2 py-1 rounded-full"
+        v-if="getExpirationWarning(room.expiresAt)"
+        class="text-xs px-2 py-1 rounded-full ml-2"
         :class="{
           'bg-red-100 text-red-600': getDaysRemaining(room.expiresAt) <= 1,
           'bg-orange-100 text-orange-600': getDaysRemaining(room.expiresAt) > 1 && getDaysRemaining(room.expiresAt) <= 3,

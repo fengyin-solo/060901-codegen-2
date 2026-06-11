@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useRoom } from '@/composables/useRoom'
 import { useExpire } from '@/composables/useExpire'
 import RoomCard from '@/components/RoomCard.vue'
-import { copyToClipboard } from '@/utils/helpers'
+import { copyToClipboard, formatDateTimeLocal, getDefaultAppointmentTime, getAppointmentReminder } from '@/utils/helpers'
+import type { Room } from '@/types'
 
 const router = useRouter()
 const { activeRooms, createRoom, joinRoomByCode, error, loadRooms } = useRoom()
@@ -17,16 +18,53 @@ const hostName = ref('')
 const joinCode = ref('')
 const joinName = ref('')
 const copySuccess = ref(false)
+const useAppointment = ref(true)
+const appointmentDateTime = ref(formatDateTimeLocal(getDefaultAppointmentTime()))
+const tick = ref(0)
+
+let timer: number | null = null
 
 onMounted(() => {
   loadRooms()
   checkAndCleanExpiredRooms()
+  timer = window.setInterval(() => {
+    tick.value++
+  }, 30000)
+})
+
+onUnmounted(() => {
+  if (timer) {
+    clearInterval(timer)
+    timer = null
+  }
+})
+
+const upcomingRooms = computed(() => {
+  const _ = tick.value
+  return activeRooms.value
+    .filter((room: Room) => {
+      const { level } = getAppointmentReminder(room.appointmentTime)
+      return level === 'urgent' || level === 'soon'
+    })
+    .map((room: Room) => {
+      const reminder = getAppointmentReminder(room.appointmentTime)
+      return { room, reminder }
+    })
+    .sort((a, b) => {
+      const timeA = a.room.appointmentTime ? new Date(a.room.appointmentTime).getTime() : 0
+      const timeB = b.room.appointmentTime ? new Date(b.room.appointmentTime).getTime() : 0
+      return timeA - timeB
+    })
 })
 
 const handleCreateRoom = () => {
   if (!roomName.value.trim() || !hostName.value.trim()) return
   
-  const room = createRoom(roomName.value.trim(), hostName.value.trim())
+  const appointmentTime = useAppointment.value && appointmentDateTime.value
+    ? new Date(appointmentDateTime.value).toISOString()
+    : null
+  
+  const room = createRoom(roomName.value.trim(), hostName.value.trim(), appointmentTime)
   
   copyToClipboard(room.code).then(() => {
     copySuccess.value = true
@@ -59,14 +97,50 @@ const closeModals = () => {
   error.value = null
   roomName.value = ''
   hostName.value = ''
+  useAppointment.value = true
+  appointmentDateTime.value = formatDateTimeLocal(getDefaultAppointmentTime())
   joinCode.value = ''
   joinName.value = ''
+}
+
+const reminderLevelClass = (level: string | null) => {
+  switch (level) {
+    case 'urgent': return 'from-red-500 to-orange-500 text-white'
+    case 'soon': return 'from-orange-400 to-yellow-400 text-white'
+    default: return 'from-purple-500 to-pink-500 text-white'
+  }
 }
 </script>
 
 <template>
   <div class="home-page min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-orange-50">
     <div class="max-w-6xl mx-auto px-4 py-8">
+      <div v-if="upcomingRooms.length > 0" class="mb-8 space-y-3">
+        <div
+          v-for="item in upcomingRooms"
+          :key="item.room.id"
+          class="rounded-2xl p-4 shadow-lg cursor-pointer transform hover:scale-[1.01] transition-all flex items-center gap-4 bg-gradient-to-r"
+          :class="reminderLevelClass(item.reminder.level)"
+          @click="goToRoom(item.room.id)"
+        >
+          <div class="text-3xl animate-pulse">
+            {{ item.reminder.level === 'urgent' ? '🚨' : '⏰' }}
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="font-bold text-lg truncate">
+              {{ item.room.name }}
+            </div>
+            <div class="text-sm opacity-90">
+              {{ item.reminder.message }}
+            </div>
+          </div>
+          <div class="text-right shrink-0">
+            <div class="text-xs opacity-80 mb-1">点击进入</div>
+            <div class="text-xl">→</div>
+          </div>
+        </div>
+      </div>
+
       <header class="text-center mb-12">
         <div class="inline-flex items-center gap-3 mb-4">
           <span class="text-5xl">🎒</span>
@@ -181,6 +255,27 @@ const closeModals = () => {
                 class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none transition-all"
                 @keyup.enter="handleCreateRoom"
               />
+            </div>
+
+            <div class="border-t border-gray-100 pt-4">
+              <label class="flex items-center gap-2 cursor-pointer mb-3">
+                <input 
+                  v-model="useAppointment"
+                  type="checkbox" 
+                  class="w-4 h-4 rounded text-purple-500 focus:ring-purple-400"
+                />
+                <span class="text-sm font-medium text-gray-700">📅 约定聚会时间</span>
+              </label>
+              <div v-if="useAppointment">
+                <input 
+                  v-model="appointmentDateTime"
+                  type="datetime-local"
+                  class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none transition-all"
+                />
+                <p class="mt-2 text-xs text-gray-500">
+                  💡 临近开始时间时会在首页和房间内提醒大家别迟到
+                </p>
+              </div>
             </div>
           </div>
           
