@@ -40,9 +40,10 @@ onUnmounted(() => {
 })
 
 const upcomingRooms = computed(() => {
-  const _ = tick.value
+  tick.value
   return activeRooms.value
     .filter((room: Room) => {
+      if (room.status !== 'preparing') return false
       const { level } = getAppointmentReminder(room.appointmentTime)
       return level === 'urgent' || level === 'soon'
     })

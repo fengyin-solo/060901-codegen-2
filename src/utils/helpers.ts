@@ -63,6 +63,7 @@ export function getMinutesUntil(targetTimeStr: string | null): number | null {
 export function getAppointmentReminder(appointmentTime: string | null): { level: 'urgent' | 'soon' | 'upcoming' | null; message: string | null } {
   const minutes = getMinutesUntil(appointmentTime)
   if (minutes === null) return { level: null, message: null }
+  if (minutes <= -30) return { level: null, message: null }
   if (minutes <= 0) return { level: 'urgent', message: '聚会时间已到，快开始吧！' }
   if (minutes <= 10) return { level: 'urgent', message: `还有 ${minutes} 分钟就要开始啦，别迟到！` }
   if (minutes <= 30) return { level: 'soon', message: `还有 ${minutes} 分钟开始，准备出发啦～` }

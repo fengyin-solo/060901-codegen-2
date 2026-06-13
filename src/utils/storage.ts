@@ -2,10 +2,18 @@ import type { Room } from '@/types'
 
 const STORAGE_KEY = 'party_topic_bag_rooms'
 
+function normalizeRoom(room: Room): Room {
+  return {
+    ...room,
+    appointmentTime: room.appointmentTime ?? null
+  }
+}
+
 export function getRooms(): Room[] {
   try {
     const data = localStorage.getItem(STORAGE_KEY)
-    return data ? JSON.parse(data) : []
+    const rooms: Room[] = data ? JSON.parse(data) : []
+    return rooms.map(normalizeRoom)
   } catch {
     return []
   }

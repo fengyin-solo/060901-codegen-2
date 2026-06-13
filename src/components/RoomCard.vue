@@ -1,9 +1,10 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { Room } from '@/types'
 import { useExpire } from '@/composables/useExpire'
 import { getDaysRemaining, formatDate, getAppointmentReminder, formatAppointmentTime } from '@/utils/helpers'
 
-defineProps<{
+const props = defineProps<{
   room: Room
 }>()
 
@@ -37,6 +38,14 @@ const reminderBadgeClass = (level: string | null) => {
     default: return 'bg-gray-100 text-gray-600 border-gray-200'
   }
 }
+
+const reminder = computed(() => getAppointmentReminder(props.room.appointmentTime))
+
+const reminderEmoji = computed(() => {
+  if (reminder.value.level === 'urgent') return '🚨'
+  if (reminder.value.level === 'soon') return '⏰'
+  return '🔔'
+})
 </script>
 
 <template>
@@ -87,12 +96,12 @@ const reminderBadgeClass = (level: string | null) => {
     
     <div class="mt-3 pt-3 border-t border-gray-100 space-y-2">
       <span
-        v-if="getAppointmentReminder(room.appointmentTime).message"
+        v-if="reminder.message"
         class="text-xs px-2 py-1 rounded-full border inline-flex items-center gap-1"
-        :class="reminderBadgeClass(getAppointmentReminder(room.appointmentTime).level)"
+        :class="reminderBadgeClass(reminder.level)"
       >
-        <span>{{ getAppointmentReminder(room.appointmentTime).level === 'urgent' ? '🚨' : getAppointmentReminder(room.appointmentTime).level === 'soon' ? '⏰' : '🔔' }}</span>
-        {{ getAppointmentReminder(room.appointmentTime).message }}
+        <span>{{ reminderEmoji }}</span>
+        {{ reminder.message }}
       </span>
       
       <span 

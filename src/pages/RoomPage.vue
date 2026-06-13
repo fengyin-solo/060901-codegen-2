@@ -45,8 +45,8 @@ const expirationWarning = computed(() =>
 )
 
 const appointmentReminder = computed(() => {
-  const _ = tick.value
-  return currentRoom.value ? getAppointmentReminder(currentRoom.value.appointmentTime) : { level: null, message: null }
+  tick.value
+  return currentRoom.value ? getAppointmentReminder(currentRoom.value.appointmentTime) : { level: null as string | null, message: null as string | null }
 })
 
 const appointmentTimeDisplay = computed(() => 
